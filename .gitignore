@@ -40,3 +40,5 @@ yarn-error.log*
 /functions/lib
 /functions/node_modules
 .vercel
+
+studio-877936351-117a0-firebase-adminsdk-fbsvc-0e7ada6c2a.json
