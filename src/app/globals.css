@@ -1,0 +1,119 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 222 47% 4%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 6%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 5%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 231 98% 66%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 222 47% 12%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 222 47% 10%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 160 100% 47%;
+    --accent-foreground: 222 47% 4%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 222 47% 15%;
+    --input: 222 47% 15%;
+    --ring: 231 98% 66%;
+    --radius: 0.3rem;
+
+    /* QUANT+ THEME (Amethyst & Indigo) */
+    --quant-primary: 262 83% 58%;
+    --quant-accent: 280 80% 60%;
+    --quant-muted: 262 40% 12%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-headline;
+  }
+}
+
+/* High-performance ticker animation for seamless loop */
+@keyframes ticker-infinite {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-ticker-infinite {
+  animation: ticker-infinite 60s linear infinite;
+}
+
+/* Mesh Gradient Animations */
+@keyframes mesh-float {
+  0% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(2%, 5%) scale(1.05); }
+  66% { transform: translate(-3%, -2%) scale(0.95); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+.animate-mesh-slow {
+  animation: mesh-float 25s ease-in-out infinite;
+}
+
+/* Icon Illumination Pulse */
+@keyframes icon-illumination {
+  0%, 100% { filter: brightness(1) contrast(1); }
+  50% { filter: brightness(1.5) contrast(1.1); }
+}
+
+.animate-icon-illumination {
+  animation: icon-illumination 2s ease-in-out infinite;
+}
+
+/* Pro Lock Pulse Animations */
+@keyframes lock-breathing {
+  0%, 100% { opacity: 0.3; filter: brightness(1); transform: scale(1); }
+  50% { opacity: 0.7; filter: brightness(2.5); transform: scale(1.05); }
+}
+
+.animate-lock-breathing {
+  animation: lock-breathing 5s ease-in-out infinite;
+}
+
+@keyframes lock-indicator-pulse {
+  0%, 100% { filter: brightness(1.2); transform: scale(1); }
+  50% { filter: brightness(3); transform: scale(1.1); }
+}
+
+.animate-lock-indicator {
+  animation: lock-indicator-pulse 3s ease-in-out infinite;
+}
+
+/* Custom scrollbar for terminal feel */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  @apply bg-background;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-muted rounded-full hover:bg-muted-foreground/50 transition-colors;
+}
+
+/* Quant+ Specific Utilities */
+.bg-quant-gradient {
+  @apply bg-gradient-to-br from-[#0A0C12] via-[#1A1033] to-[#0A0C12];
+}
+.border-quant {
+  @apply border-[hsl(var(--quant-primary)/0.3)];
+}
+.text-quant {
+  @apply text-[hsl(var(--quant-primary))];
+}

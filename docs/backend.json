@@ -1,0 +1,112 @@
+
+{
+  "entities": {
+    "NormalizedTick": {
+      "title": "NormalizedTick",
+      "description": "Unified high-fidelity market tick with log-odds transform and liquidity scoring.",
+      "type": "object",
+      "properties": {
+        "marketId": { "type": "string" },
+        "ts": { "type": "string", "format": "date-time" },
+        "q": { "type": "number", "description": "Clamped probability (0.001 - 0.999)" },
+        "r": { "type": "number", "description": "Log-odds transform: log(q/(1-q))" },
+        "dr": { "type": "number", "description": "Delta log-odds" },
+        "liq": { "type": "number", "description": "Normalized liquidity score 0-1" }
+      },
+      "required": ["marketId", "ts", "q", "r"]
+    },
+    "GadState": {
+      "title": "GadState",
+      "description": "Structural state of a market node derived from the GAD filtering engine.",
+      "type": "object",
+      "properties": {
+        "marketId": { "type": "string" },
+        "lambda": { "type": "number", "description": "Adaptive discontinuity state" },
+        "v": { "type": "number", "description": "Latent instantaneous variance" },
+        "jumpProb": { "type": "number", "description": "Jump probability for next interval" },
+        "regime": { "type": "string", "enum": ["stable", "stressed", "discontinuous"] }
+      },
+      "required": ["marketId", "lambda", "v", "jumpProb"]
+    },
+    "BacktestResult": {
+      "title": "BacktestResult",
+      "description": "Performance metrics for a sequential walk-forward GAD replay.",
+      "type": "object",
+      "properties": {
+        "runId": { "type": "string" },
+        "marketId": { "type": "string" },
+        "hitRate": { "type": "number" },
+        "brierScore": { "type": "number" },
+        "expectedValueRealized": { "type": "number" }
+      },
+      "required": ["runId", "marketId", "hitRate", "brierScore"]
+    },
+    "MarketDiagnostic": {
+      "title": "MarketDiagnostic",
+      "description": "Data quality and sampling metrics for GAD engine auditability.",
+      "type": "object",
+      "properties": {
+        "marketId": { "type": "string" },
+        "date": { "type": "string" },
+        "samplingIntervalAvg": { "type": "number" },
+        "missingTicksCount": { "type": "number" },
+        "clampingEventsCount": { "type": "number" },
+        "filterHealth": { "type": "number" }
+      },
+      "required": ["marketId", "date"]
+    },
+    "SignalIssued": {
+      "title": "SignalIssued",
+      "description": "High-conviction GAD decision record with risk-adjusted edge data.",
+      "type": "object",
+      "properties": {
+        "marketId": { "type": "string" },
+        "ts": { "type": "string", "format": "date-time" },
+        "stance": { "type": "string", "enum": ["BET", "NO_BET", "WAIT"] },
+        "direction": { "type": "string", "enum": ["YES", "NO"] },
+        "adjEdge": { "type": "number" },
+        "rationale": { "type": "string" }
+      },
+      "required": ["marketId", "ts", "stance"]
+    },
+    "AdminRole": {
+      "title": "AdminRole",
+      "description": "Administrative authority record for node security.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "grantedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId"]
+    }
+  },
+  "auth": {
+    "providers": ["password", "anonymous"]
+  },
+  "firestore": {
+    "/normalizedTicks/{id}": {
+      "schema": { "$ref": "#/backend/entities/NormalizedTick" },
+      "description": "High-frequency GAD-ready time series data."
+    },
+    "/marketState/{id}": {
+      "schema": { "$ref": "#/backend/entities/GadState" },
+      "description": "Real-time GAD filter output per discovery node."
+    },
+    "/signalsIssued/{id}": {
+      "schema": { "$ref": "#/backend/entities/SignalIssued" },
+      "description": "High-conviction GAD decisions and risk-adjusted edge data."
+    },
+    "/backtests/{id}": {
+      "schema": { "$ref": "#/backend/entities/BacktestResult" },
+      "description": "Historical replay audit and validation logs."
+    },
+    "/marketDiagnostics/{id}": {
+      "schema": { "$ref": "#/backend/entities/MarketDiagnostic" },
+      "description": "Data quality and ingestion health metrics."
+    },
+    "/roles_admin/{id}": {
+      "schema": { "$ref": "#/backend/entities/AdminRole" },
+      "description": "Administrative role registry for secure terminal control."
+    }
+  }
+}
