@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 import { PublicLedgerEntry } from '@/lib/types';
 import { calculatePnl } from '@/lib/pnl';
 import { cn } from '@/lib/utils';
+import { buildVenueUrl } from '@/lib/venue-url';
 import { 
   ShieldCheck, 
   Activity, 
@@ -324,12 +325,10 @@ export default function ProTerminalPage() {
 
   const getVenueUrl = (entry: PublicLedgerEntry) => {
     const identifier = entry.marketId.split('_').slice(1).join('_');
-    if (entry.venue.toLowerCase() === 'polymarket') {
-      return /^\d+$/.test(identifier) 
-        ? `https://polymarket.com/market/${identifier}` 
-        : `https://polymarket.com/event/${identifier}`;
-    }
-    return `https://kalshi.com/markets/${identifier}`;
+    return buildVenueUrl({
+      venue: entry.venue,
+      venueMarketId: identifier,
+    });
   };
 
   if (!mounted) return null;

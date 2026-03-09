@@ -52,6 +52,7 @@ import {
 } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
+import { buildVenueUrl } from '@/lib/venue-url'
 import {
   LineChart,
   Line,
@@ -309,7 +310,14 @@ function LedgerRow({ entry }: { entry: PublicLedgerEntry }) {
                     <History className="w-3.5 h-3.5" /> Journey
                   </Button>
                   <Button variant="outline" size="sm" className="flex-1 text-[9px] font-black uppercase gap-2 h-8" asChild>
-                    <a href={entry.venue === 'polymarket' ? `https://polymarket.com/event/${entry.venueMarketId}` : `https://kalshi.com/markets/${entry.venueMarketId}`} target="_blank" rel="noopener noreferrer">
+                    <a
+                      href={buildVenueUrl({
+                        venue: entry.venue,
+                        venueMarketId: entry.venueMarketId,
+                      })}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
                       <ExternalLink className="w-3.5 h-3.5" /> Venue
                     </a>
                   </Button>

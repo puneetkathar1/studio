@@ -67,6 +67,7 @@ import {
   ShieldAlert
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { buildVenueUrl } from '@/lib/venue-url';
 import { ProOpportunity, ProControls } from '@/lib/pro-champion/types';
 import { TickerTape } from '@/components/terminal/ticker-tape';
 import { PublicLedgerEntry, Market } from '@/lib/types';
@@ -219,6 +220,8 @@ export default function ProChampionPage() {
                 kalshiMarketId: kalshi.id, 
                 polyVenueMarketId: poly.venueMarketId, 
                 kalshiVenueMarketId: kalshi.venueMarketId, 
+                polyVenueUrl: poly.venueUrl,
+                kalshiVenueUrl: kalshi.venueUrl,
                 polyPrice: poly.priceProb, 
                 kalshiPrice: kalshi.priceProb, 
                 polyLiquidity: weightedPolyLiq,
@@ -269,6 +272,7 @@ export default function ProChampionPage() {
             kalshiMarketId: 'sim_offset_node',
             polyVenueMarketId: m.venueMarketId,
             kalshiVenueMarketId: 'sim_offset_venue',
+            polyVenueUrl: m.venueUrl,
             polyPrice: m.priceProb || 0.5,
             kalshiPrice: (m.priceProb || 0.5) + simDiv,
             polyLiquidity: baseLiq * finalPolyWeight,
@@ -679,7 +683,15 @@ export default function ProChampionPage() {
                               </Button>
                             </div>
                             <Button size="sm" variant="outline" className="w-full h-7 text-[8px] font-black uppercase border-primary/20 hover:bg-primary/10 mt-2 gap-1.5" asChild>
-                              <a href={`https://polymarket.com/event/${selectedOpp.arbDetails?.polyVenueMarketId}`} target="_blank" rel="noopener noreferrer">
+                              <a
+                                href={buildVenueUrl({
+                                  venue: 'polymarket',
+                                  venueMarketId: selectedOpp.arbDetails?.polyVenueMarketId,
+                                  venueUrl: selectedOpp.arbDetails?.polyVenueUrl,
+                                })}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
                                 <ExternalLinkIcon className="w-2.5 h-2.5" /> Bridge to Venue
                               </a>
                             </Button>
@@ -699,7 +711,15 @@ export default function ProChampionPage() {
                               </Button>
                             </div>
                             <Button size="sm" variant="outline" className="w-full h-7 text-[8px] font-black uppercase border-blue-400/20 hover:bg-blue-400/10 mt-2 gap-1.5" asChild>
-                              <a href={`https://kalshi.com/markets/${selectedOpp.arbDetails?.kalshiVenueMarketId}`} target="_blank" rel="noopener noreferrer">
+                              <a
+                                href={buildVenueUrl({
+                                  venue: 'kalshi',
+                                  venueMarketId: selectedOpp.arbDetails?.kalshiVenueMarketId,
+                                  venueUrl: selectedOpp.arbDetails?.kalshiVenueUrl,
+                                })}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                              >
                                 <ExternalLinkIcon className="w-2.5 h-2.5" /> Bridge to Venue
                               </a>
                             </Button>

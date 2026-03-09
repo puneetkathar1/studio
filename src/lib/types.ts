@@ -42,6 +42,7 @@ export type Market = {
   eventId?: string;
   venue: 'polymarket' | 'kalshi' | 'other';
   venueMarketId: string;
+  venueUrl?: string;
   title: string;
   question?: string;
   conditionId?: string;

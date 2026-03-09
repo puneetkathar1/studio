@@ -38,6 +38,7 @@ import {
   Network
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { buildVenueUrl } from '@/lib/venue-url';
 import { format, subHours, subDays } from 'date-fns';
 import { getEffectiveStance } from '@/lib/intelligence';
 import { useCountdown } from '@/hooks/use-countdown';
@@ -160,13 +161,11 @@ export default function IntelligenceJourneyPage() {
   if (!market || !intel) return <div className="h-96 flex flex-col items-center justify-center opacity-20 gap-4"><Waves className="w-16 h-16 animate-pulse" /><p className="uppercase font-black tracking-widest">Node Isolation Failed</p></div>;
 
   const getVenueUrl = () => {
-    const identifier = market.venueMarketId || market.id;
-    if (market.venue === 'polymarket') {
-      return /^\d+$/.test(identifier) 
-        ? `https://polymarket.com/market/${identifier}` 
-        : `https://polymarket.com/event/${identifier}`;
-    }
-    return `https://kalshi.com/markets/${identifier}`;
+    return buildVenueUrl({
+      venue: market.venue,
+      venueMarketId: market.venueMarketId || market.id,
+      venueUrl: market.venueUrl,
+    });
   };
 
   return (

@@ -40,6 +40,7 @@ import {
   PieChart
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { buildVenueUrl } from '@/lib/venue-url';
 import { TickerTape } from '@/components/terminal/ticker-tape';
 import { Market, PublicLedgerEntry, WatchlistItem, Event } from '@/lib/types';
 import { useCountdown } from '@/hooks/use-countdown';
@@ -563,7 +564,15 @@ export default function MarketsTerminalPage() {
                   <AnalysisDialog market={selectedMarket} />
                 </div>
                 <Button variant="outline" className="w-full text-[9px] sm:text-[10px] font-black uppercase border-white/10 hover:bg-white/5 h-10 gap-2" asChild>
-                  <a href={selectedMarket.venue === 'polymarket' ? `https://polymarket.com/event/${selectedMarket.venueMarketId}` : `https://kalshi.com/markets/${selectedMarket.venueMarketId}`} target="_blank" rel="noopener noreferrer">
+                  <a
+                    href={buildVenueUrl({
+                      venue: selectedMarket.venue,
+                      venueMarketId: selectedMarket.venueMarketId,
+                      venueUrl: selectedMarket.venueUrl,
+                    })}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     Venue Contract <ExternalLink className="w-3.5 h-3.5" />
                   </a>
                 </Button>

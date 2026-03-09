@@ -10,6 +10,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { format } from 'date-fns';
 import { Timestamp } from 'firebase/firestore';
 import Link from 'next/link';
+import { buildVenueUrl } from '@/lib/venue-url';
 
 interface TerminalBodyProps {
   entries: PublicLedgerEntry[];
@@ -22,14 +23,10 @@ interface TerminalBodyProps {
 export function TerminalBody({ entries, selectedEntry, isLoading, onSelect, filters }: TerminalBodyProps) {
   // CRITICAL: Robust Deep-Linking logic using venueMarketId
   const getVenueUrl = (entry: PublicLedgerEntry) => {
-    const venueIdentifier = entry.venueMarketId;
-    if (entry.venue.toLowerCase() === 'polymarket') {
-      // SMART ROUTING: Use /market/ for numeric IDs and /event/ for slugs
-      return /^\d+$/.test(venueIdentifier)
-        ? `https://polymarket.com/market/${venueIdentifier}`
-        : `https://polymarket.com/event/${venueIdentifier}`;
-    }
-    return `https://kalshi.com/markets/${venueIdentifier}`;
+    return buildVenueUrl({
+      venue: entry.venue,
+      venueMarketId: entry.venueMarketId,
+    });
   };
 
   return (

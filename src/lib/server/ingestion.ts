@@ -4,6 +4,7 @@ import { getDb } from "@/firebase/admin";
 
 const KALSHI_API_BASE = "https://api.elections.kalshi.com/trade-api/v2";
 const POLYMARKET_GAMMA_URL = "https://gamma-api.polymarket.com/events";
+const INGEST_LOG_VERBOSE = process.env.INGEST_LOG_VERBOSE === "1";
 
 type Venue = "kalshi" | "polymarket";
 
@@ -29,6 +30,7 @@ type IngestionAllResult = {
 type NormalizedMarket = {
   venue: Venue;
   venueMarketId: string;
+  venueUrl: string;
   title: string;
   category: string;
   status: "open" | "closed";
@@ -48,6 +50,17 @@ type NormalizedMarket = {
     liquidity: number;
   };
 };
+
+function ingestLog(step: string, payload: Record<string, unknown> = {}): void {
+  console.log(
+    JSON.stringify({
+      scope: "ingestion",
+      step,
+      ts: new Date().toISOString(),
+      ...payload,
+    })
+  );
+}
 
 function toNumber(value: unknown, fallback = 0): number {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -81,10 +94,46 @@ function resolveKalshiTitle(market: any): string {
   return "Untitled Market";
 }
 
+function slugifySegment(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function resolveKalshiVenueUrl(event: any, market: any, ticker: string): string {
+  const rawMarketUrl = String(market?.url || "").trim();
+  if (/^https?:\/\//i.test(rawMarketUrl)) return rawMarketUrl;
+  if (rawMarketUrl) return `https://kalshi.com${rawMarketUrl.startsWith("/") ? rawMarketUrl : `/${rawMarketUrl}`}`;
+
+  const rawEventUrl = String(event?.url || "").trim();
+  if (/^https?:\/\//i.test(rawEventUrl)) return rawEventUrl;
+  if (rawEventUrl) return `https://kalshi.com${rawEventUrl.startsWith("/") ? rawEventUrl : `/${rawEventUrl}`}`;
+
+  // Build Kalshi canonical-style event page URL when API doesn't provide url.
+  // Example:
+  // /markets/kxnextukpm/next-uk-pm/kxnextukpm-30
+  const seriesTicker = String(market?.series_ticker || event?.series_ticker || "").trim();
+  const eventTicker = String(market?.event_ticker || event?.event_ticker || "").trim();
+  const eventTitle = String(event?.title || "").trim();
+  if (seriesTicker && eventTicker && eventTitle) {
+    const seriesSeg = slugifySegment(seriesTicker);
+    const titleSeg = slugifySegment(eventTitle);
+    const eventSeg = slugifySegment(eventTicker);
+    if (seriesSeg && titleSeg && eventSeg) {
+      return `https://kalshi.com/markets/${seriesSeg}/${titleSeg}/${eventSeg}`;
+    }
+  }
+
+  return `https://kalshi.com/markets/${ticker}`;
+}
+
 async function fetchKalshiMarkets(limitMarkets = 100): Promise<NormalizedMarket[]> {
   const url = new URL(`${KALSHI_API_BASE}/events`);
   url.searchParams.set("limit", "100");
   url.searchParams.set("with_nested_markets", "true");
+  ingestLog("kalshi.fetch.start", { url: url.toString(), limitMarkets });
 
   const response = await fetch(url.toString(), {
     headers: { Accept: "application/json", "User-Agent": "NextIngestion/1.0" },
@@ -92,28 +141,58 @@ async function fetchKalshiMarkets(limitMarkets = 100): Promise<NormalizedMarket[
     signal: AbortSignal.timeout(30000),
   });
   if (!response.ok) {
+    ingestLog("kalshi.fetch.error", { status: response.status, statusText: response.statusText });
     throw new Error(`Kalshi events API failed: ${response.status}`);
   }
+  ingestLog("kalshi.fetch.response", {
+    status: response.status,
+    statusText: response.statusText,
+    contentType: response.headers.get("content-type"),
+  });
 
   const data = await response.json();
   const events = Array.isArray(data?.events) ? data.events : [];
+  ingestLog("kalshi.fetch.shape", {
+    hasEventsArray: Array.isArray(data?.events),
+    eventsCount: events.length,
+    hasCursor: Boolean(data?.cursor),
+    sampleEventTickers: events.slice(0, 3).map((e: any) => String(e?.event_ticker || "")),
+  });
   const dedup = new Map<string, NormalizedMarket>();
+  let nestedMarketsSeen = 0;
+  let tradableMarketsSeen = 0;
+  let invalidEventCount = 0;
 
   for (const event of events) {
     const eventTicker = String(event?.event_ticker || "");
-    if (!eventTicker) continue;
+    if (!eventTicker) {
+      invalidEventCount++;
+      continue;
+    }
 
     const eventTitle = String(event?.title || "Untitled Event");
     const eventCategory = String(event?.category || "General");
     const eventStatus = mapKalshiStatus(event?.status);
     const eventId = `kalshi_ev_${eventTicker}`;
     const nestedMarkets = Array.isArray(event?.markets) ? event.markets : [];
+    nestedMarketsSeen += nestedMarkets.length;
+    if (INGEST_LOG_VERBOSE) {
+      ingestLog("kalshi.event.sample", {
+        eventTicker,
+        category: eventCategory,
+        status: eventStatus,
+        nestedMarkets: nestedMarkets.length,
+        eventUrl: String(event?.url || ""),
+      });
+    }
 
     for (const market of nestedMarkets) {
       const ticker = String(market?.ticker || "");
       if (!ticker || !isKalshiTradable(market?.status)) continue;
+      tradableMarketsSeen++;
 
       const marketTitle = resolveKalshiTitle(market);
+      const venueUrl = resolveKalshiVenueUrl(event, market, ticker);
       const status = mapKalshiStatus(market?.status);
       const volume = toNumber(market?.volume_24h, toNumber(market?.volume, 0));
       const liquidity = toNumber(market?.open_interest, 0);
@@ -127,6 +206,7 @@ async function fetchKalshiMarkets(limitMarkets = 100): Promise<NormalizedMarket[
       const normalized: NormalizedMarket = {
         venue: "kalshi",
         venueMarketId: ticker,
+        venueUrl,
         title: marketTitle,
         category: eventCategory,
         status,
@@ -151,12 +231,36 @@ async function fetchKalshiMarkets(limitMarkets = 100): Promise<NormalizedMarket[
       if (!existing || normalized.volume > existing.volume) {
         dedup.set(ticker, normalized);
       }
+
+      if (INGEST_LOG_VERBOSE && dedup.size <= 10) {
+        ingestLog("kalshi.market.url.sample", {
+          ticker,
+          rawMarketUrl: String(market?.url || ""),
+          rawEventUrl: String(event?.url || ""),
+          resolvedVenueUrl: venueUrl,
+        });
+      }
     }
   }
 
-  return Array.from(dedup.values())
+  const selected = Array.from(dedup.values())
     .sort((a, b) => b.volume - a.volume)
     .slice(0, limitMarkets);
+  ingestLog("kalshi.fetch.final", {
+    invalidEventCount,
+    nestedMarketsSeen,
+    tradableMarketsSeen,
+    dedupedMarkets: dedup.size,
+    selectedMarkets: selected.length,
+    sampleMarkets: selected.slice(0, 3).map((m) => ({
+      venueMarketId: m.venueMarketId,
+      title: m.title,
+      venueUrl: m.venueUrl,
+      eventId: m.event.id,
+      category: m.category,
+    })),
+  });
+  return selected;
 }
 
 function resolvePolymarketTitle(market: any, event: any): string {
@@ -177,6 +281,7 @@ async function fetchPolymarketMarkets(limitMarkets = 100): Promise<NormalizedMar
   url.searchParams.set("active", "true");
   url.searchParams.set("closed", "false");
   url.searchParams.set("archived", "false");
+  ingestLog("polymarket.fetch.start", { url: url.toString(), limitMarkets });
 
   const response = await fetch(url.toString(), {
     headers: { Accept: "application/json", "User-Agent": "NextIngestion/1.0" },
@@ -184,24 +289,70 @@ async function fetchPolymarketMarkets(limitMarkets = 100): Promise<NormalizedMar
     signal: AbortSignal.timeout(30000),
   });
   if (!response.ok) {
+    ingestLog("polymarket.fetch.error", { status: response.status, statusText: response.statusText });
     throw new Error(`Polymarket events API failed: ${response.status}`);
   }
+  ingestLog("polymarket.fetch.response", {
+    status: response.status,
+    statusText: response.statusText,
+    contentType: response.headers.get("content-type"),
+  });
 
   const events = await response.json();
+  const eventsArray = Array.isArray(events) ? events : [];
+  ingestLog("polymarket.fetch.shape", {
+    isArray: Array.isArray(events),
+    eventsCount: eventsArray.length,
+    sampleEventIds: eventsArray.slice(0, 3).map((e: any) => String(e?.id || "")),
+    sampleEventSlugs: eventsArray.slice(0, 3).map((e: any) => String(e?.slug || "")),
+  });
   const dedup = new Map<string, NormalizedMarket>();
+  let invalidEventCount = 0;
+  let nestedMarketsSeen = 0;
+  let activeMarketsSeen = 0;
 
-  for (const event of Array.isArray(events) ? events : []) {
+  for (const event of eventsArray) {
     const eventId = String(event?.id || "");
-    if (!eventId) continue;
+    if (!eventId) {
+      invalidEventCount++;
+      continue;
+    }
     const eventTitle = String(event?.title || "Untitled Event");
     const eventCategory = String(event?.tags?.[0]?.label || event?.category || "General");
     const eventStatus = event?.closed ? "closed" : "open";
     const eventMarkets = Array.isArray(event?.markets) ? event.markets : [];
+    nestedMarketsSeen += eventMarkets.length;
+    if (INGEST_LOG_VERBOSE) {
+      ingestLog("polymarket.event.sample", {
+        eventId,
+        eventSlug: String(event?.slug || ""),
+        category: eventCategory,
+        status: eventStatus,
+        nestedMarkets: eventMarkets.length,
+      });
+    }
 
     for (const market of eventMarkets) {
       if (!market?.active || market?.closed) continue;
+      activeMarketsSeen++;
       const venueMarketId = String(market?.slug || market?.id || "");
       if (!venueMarketId) continue;
+      const eventSlug = String(event?.slug || "").trim();
+      const marketSlug = String(market?.slug || "").trim();
+      const rawUrl = String(market?.url || "").trim();
+
+      let venueUrl = "";
+      if (/^https?:\/\//i.test(rawUrl)) {
+        venueUrl = rawUrl;
+      } else if (rawUrl) {
+        venueUrl = `https://polymarket.com${rawUrl.startsWith("/") ? rawUrl : `/${rawUrl}`}`;
+      } else if (eventSlug && marketSlug) {
+        venueUrl = `https://polymarket.com/event/${eventSlug}/${marketSlug}`;
+      } else if (/^\d+$/.test(venueMarketId)) {
+        venueUrl = `https://polymarket.com/market/${venueMarketId}`;
+      } else {
+        venueUrl = `https://polymarket.com/event/${venueMarketId}`;
+      }
 
       const title = resolvePolymarketTitle(market, event);
       const volume = toNumber(market?.volumeNum, toNumber(market?.volume, 0));
@@ -219,6 +370,7 @@ async function fetchPolymarketMarkets(limitMarkets = 100): Promise<NormalizedMar
       const normalized: NormalizedMarket = {
         venue: "polymarket",
         venueMarketId,
+        venueUrl,
         title,
         category: eventCategory,
         status: "open",
@@ -246,14 +398,30 @@ async function fetchPolymarketMarkets(limitMarkets = 100): Promise<NormalizedMar
     }
   }
 
-  return Array.from(dedup.values())
+  const selected = Array.from(dedup.values())
     .sort((a, b) => b.volume - a.volume)
     .slice(0, limitMarkets);
+  ingestLog("polymarket.fetch.final", {
+    invalidEventCount,
+    nestedMarketsSeen,
+    activeMarketsSeen,
+    dedupedMarkets: dedup.size,
+    selectedMarkets: selected.length,
+    sampleMarkets: selected.slice(0, 3).map((m) => ({
+      venueMarketId: m.venueMarketId,
+      title: m.title,
+      venueUrl: m.venueUrl,
+      eventId: m.event.id,
+      category: m.category,
+    })),
+  });
+  return selected;
 }
 
 async function closeStaleOpenMarkets(venue: Venue, keepMarketDocIds: Set<string>): Promise<number> {
   const db = getDb();
   const snapshot = await db.collection("markets").where("venue", "==", venue).where("status", "==", "open").get();
+  ingestLog("stale.close.scan", { venue, openMarketDocs: snapshot.size, keepDocs: keepMarketDocIds.size });
   let closed = 0;
   let batch = db.batch();
   let ops = 0;
@@ -273,10 +441,21 @@ async function closeStaleOpenMarkets(venue: Venue, keepMarketDocIds: Set<string>
   if (ops > 0) {
     await batch.commit();
   }
+  ingestLog("stale.close.done", { venue, closed });
   return closed;
 }
 
 async function ingestVenueMarkets(venue: Venue, markets: NormalizedMarket[]): Promise<IngestionResult> {
+  ingestLog("venue.ingest.start", {
+    venue,
+    markets: markets.length,
+    sample: markets.slice(0, 3).map((m) => ({
+      venueMarketId: m.venueMarketId,
+      title: m.title,
+      eventId: m.event.id,
+      venueUrl: m.venueUrl,
+    })),
+  });
   const db = getDb();
   const keepIds = new Set<string>();
   const eventSeen = new Set<string>();
@@ -317,6 +496,7 @@ async function ingestVenueMarkets(venue: Venue, markets: NormalizedMarket[]): Pr
           id: marketId,
           venue,
           venueMarketId: market.venueMarketId,
+          venueUrl: market.venueUrl,
           eventId: market.event.id,
           title: market.title,
           category: market.category,
@@ -343,8 +523,14 @@ async function ingestVenueMarkets(venue: Venue, markets: NormalizedMarket[]): Pr
         batch = db.batch();
         ops = 0;
       }
-    } catch {
+    } catch (error: any) {
       failed++;
+      ingestLog("venue.ingest.market.error", {
+        venue,
+        venueMarketId: market.venueMarketId,
+        eventId: market.event.id,
+        message: error?.message || "unknown",
+      });
     }
   }
 
@@ -353,32 +539,41 @@ async function ingestVenueMarkets(venue: Venue, markets: NormalizedMarket[]): Pr
   }
 
   const closedStale = await closeStaleOpenMarkets(venue, keepIds);
-  return {
+  const result = {
     fetched: markets.length,
     successful,
     failed: failed + Math.max(markets.length - successful - failed, 0),
     uniqueEvents: eventSeen.size,
     closedStale,
   };
+  ingestLog("venue.ingest.done", { venue, ...result });
+  return result;
 }
 
 export async function runKalshiIngestion(limitMarkets = 100): Promise<IngestionResult> {
+  ingestLog("kalshi.ingest.start", { limitMarkets });
   const markets = await fetchKalshiMarkets(limitMarkets);
-  return ingestVenueMarkets("kalshi", markets);
+  const result = await ingestVenueMarkets("kalshi", markets);
+  ingestLog("kalshi.ingest.done", result);
+  return result;
 }
 
 export async function runPolymarketIngestion(limitMarkets = 100): Promise<IngestionResult> {
+  ingestLog("polymarket.ingest.start", { limitMarkets });
   const markets = await fetchPolymarketMarkets(limitMarkets);
-  return ingestVenueMarkets("polymarket", markets);
+  const result = await ingestVenueMarkets("polymarket", markets);
+  ingestLog("polymarket.ingest.done", result);
+  return result;
 }
 
 export async function runIngestionAll(limitMarketsPerVenue = 100): Promise<IngestionAllResult> {
+  ingestLog("ingest.all.start", { limitMarketsPerVenue });
   const [kalshi, polymarket] = await Promise.all([
     runKalshiIngestion(limitMarketsPerVenue),
     runPolymarketIngestion(limitMarketsPerVenue),
   ]);
 
-  return {
+  const result = {
     kalshi,
     polymarket,
     totals: {
@@ -388,4 +583,6 @@ export async function runIngestionAll(limitMarketsPerVenue = 100): Promise<Inges
       closedStale: kalshi.closedStale + polymarket.closedStale,
     },
   };
+  ingestLog("ingest.all.done", result);
+  return result;
 }

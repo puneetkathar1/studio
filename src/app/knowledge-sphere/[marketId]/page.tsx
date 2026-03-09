@@ -35,6 +35,7 @@ import {
   BarChart3
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { buildVenueUrl } from '@/lib/venue-url';
 import { format } from 'date-fns';
 import {
   AreaChart,
@@ -340,9 +341,11 @@ export default function KnowledgeDetail() {
           </div>
           <div className="flex items-center gap-3 ml-4">
             <ExternalLink className="w-4 h-4 text-muted-foreground hover:text-primary cursor-pointer transition-colors" onClick={() => {
-              const url = market.venue === 'polymarket' 
-                ? `https://polymarket.com/market/${market.venueMarketId}` 
-                : `https://kalshi.com/markets/${market.venueMarketId}`;
+              const url = buildVenueUrl({
+                venue: market.venue,
+                venueMarketId: market.venueMarketId,
+                venueUrl: market.venueUrl,
+              });
               window.open(url, '_blank');
             }} />
             <Info className="w-4 h-4 text-muted-foreground hover:text-primary cursor-pointer transition-colors" onClick={() => {

@@ -53,6 +53,8 @@ export interface ArbitrageOpportunity {
   kalshiMarketId: string;
   polyVenueMarketId: string;
   kalshiVenueMarketId: string;
+  polyVenueUrl?: string;
+  kalshiVenueUrl?: string;
   polyPrice: number;
   kalshiPrice: number;
   polyLiquidity: number;

@@ -42,6 +42,7 @@ import {
   Fingerprint
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { buildVenueUrl } from '@/lib/venue-url';
 import { TickerTape } from '@/components/terminal/ticker-tape';
 import { PublicLedgerEntry, Market, Event, MarketTick, MarketState, ExternalSignal } from '@/lib/types';
 import Link from 'next/link';
@@ -499,7 +500,15 @@ export default function TerminalProPage() {
 
                     <div className="flex gap-3">
                       <Button variant="outline" className="h-12 border-white/10 bg-white/[0.02] text-[10px] font-black gap-2 px-8 uppercase group hover:border-primary/50" asChild>
-                        <a href={market.venue === 'polymarket' ? `https://polymarket.com/event/${market.venueMarketId}` : `https://kalshi.com/markets/${market.venueMarketId}`} target="_blank" rel="noopener noreferrer">
+                        <a
+                          href={buildVenueUrl({
+                            venue: market.venue,
+                            venueMarketId: market.venueMarketId,
+                            venueUrl: market.venueUrl,
+                          })}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
                           Bridge to Venue <ExternalLink className="w-3.5 h-3.5" />
                         </a>
                       </Button>

@@ -32,6 +32,7 @@ import {
   Waves
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { buildVenueUrl } from '@/lib/venue-url';
 import { ProOpportunity, ProControls } from '@/lib/pro-champion/types';
 import { TickerTape } from '@/components/terminal/ticker-tape';
 import { PublicLedgerEntry, Market } from '@/lib/types';
@@ -130,10 +131,11 @@ export default function ProChampionTerminalPage() {
   );
 
   const getVenueUrl = (opp: ProOpportunity) => {
-    const venueMarketId = opp.market.id.split('_').slice(1).join('_');
-    return opp.market.venue.toLowerCase() === 'polymarket'
-      ? `https://polymarket.com/event/${venueMarketId}`
-      : `https://kalshi.com/markets/${venueMarketId}`;
+    return buildVenueUrl({
+      venue: opp.market.venue,
+      venueMarketId: opp.market.venueMarketId || opp.market.id.split('_').slice(1).join('_'),
+      venueUrl: (opp.market as any).venueUrl,
+    });
   };
 
   if (!mounted) return null;
