@@ -85,6 +85,18 @@ export default function TopNav() {
   const isPro = plan === 'pro' || plan === 'internal';
   const isInst = plan === 'internal';
 
+  // Render a stable shell on server + first client pass to avoid hydration
+  // mismatches when browser extensions mutate anchor attributes pre-hydration.
+  if (!mounted) {
+    return (
+      <nav className="sticky top-0 z-50 w-full border-b border-white/5 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 overflow-hidden" suppressHydrationWarning>
+        <div className="max-w-[1600px] mx-auto relative px-4 py-2" suppressHydrationWarning>
+          <div className="h-[3.5rem] rounded border border-white/5 bg-background/40" />
+        </div>
+      </nav>
+    );
+  }
+
   const navGroups = [
     {
       label: 'DISCOVERY',
@@ -240,7 +252,7 @@ export default function TopNav() {
 
           {/* USER & SYSTEM HUD */}
           <div className="flex items-center gap-2 sm:gap-4 shrink-0">
-            {mounted && !isUserLoading && (
+            {!isUserLoading && (
               user ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>

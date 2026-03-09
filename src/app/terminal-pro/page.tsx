@@ -512,8 +512,21 @@ export default function TerminalProPage() {
                           Bridge to Venue <ExternalLink className="w-3.5 h-3.5" />
                         </a>
                       </Button>
-                      <Button className="h-12 text-[10px] font-black gap-2 px-10 uppercase shadow-lg shadow-primary/20 bg-primary text-primary-foreground hover:bg-primary/90">
-                        EXECUTE ATOMIC <Activity className="w-3.5 h-3.5" />
+                      <Button
+                        className="h-12 text-[10px] font-black gap-2 px-10 uppercase shadow-lg shadow-primary/20 bg-primary text-primary-foreground hover:bg-primary/90"
+                        asChild
+                      >
+                        <a
+                          href={buildVenueUrl({
+                            venue: market.venue,
+                            venueMarketId: market.venueMarketId,
+                            venueUrl: market.venueUrl,
+                          })}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          EXECUTE ATOMIC <Activity className="w-3.5 h-3.5" />
+                        </a>
                       </Button>
                     </div>
                   </div>

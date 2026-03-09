@@ -27,10 +27,12 @@ import { HeroMarket } from '@/components/terminal/hero-market';
 import { cn } from '@/lib/utils';
 import { ProtocolStep } from '@/components/intelligence/ProtocolStep';
 import { IntelligenceProtocolSOP } from '@/components/intelligence/IntelligenceProtocolSOP';
+import { buildVenueUrl } from '@/lib/venue-url';
 
 export default function TerminalDashboardPage() {
   const firestore = useFirestore();
   const [selectedHeroMarket, setSelectedHeroMarket] = useState<Market | null>(null);
+  const [mounted, setMounted] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('all-markets');
   const [viewMode, setViewMode] = useState<'events' | 'markets'>('events');
@@ -42,6 +44,10 @@ export default function TerminalDashboardPage() {
     [firestore]
   );
   const { data: topMarkets } = useCollection<Market>(topMarketQuery);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (topMarkets && topMarkets.length > 0 && !selectedHeroMarket) {
@@ -66,6 +72,24 @@ export default function TerminalDashboardPage() {
     { id: 'culture', label: 'Culture' },
     { id: 'weather', label: 'Weather' },
   ];
+
+  const autoTradeHref = selectedHeroMarket
+    ? buildVenueUrl({
+        venue: selectedHeroMarket.venue,
+        venueMarketId: selectedHeroMarket.venueMarketId,
+        venueUrl: selectedHeroMarket.venueUrl,
+      })
+    : '#';
+
+  if (!mounted) {
+    return (
+      <div className="space-y-6 animate-in fade-in duration-700 pb-20 max-w-[1600px] mx-auto px-4 text-left">
+        <div className="h-96 w-full rounded-xl border border-dashed border-white/10 bg-card/20" />
+        <div className="h-40 w-full rounded-xl border border-dashed border-white/10 bg-card/20" />
+        <div className="h-[520px] w-full rounded-xl border border-dashed border-white/10 bg-card/20" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-700 pb-20 max-w-[1600px] mx-auto px-4 text-left">
@@ -98,8 +122,14 @@ export default function TerminalDashboardPage() {
             <Button variant="outline" className="h-12 text-[10px] font-black uppercase border-white/10 gap-2 px-6" asChild>
               <Link href="/terminal-pro"><Maximize2 className="w-4 h-4" /> Full Screen Pro</Link>
             </Button>
-            <Button className="h-12 text-[10px] font-black uppercase gap-2 shadow-lg shadow-primary/20 px-6">
-              <Zap className="w-4 h-4 fill-current" /> Auto-Trade
+            <Button
+              className="h-12 text-[10px] font-black uppercase gap-2 shadow-lg shadow-primary/20 px-6"
+              asChild
+              disabled={!selectedHeroMarket}
+            >
+              <a href={autoTradeHref} target="_blank" rel="noopener noreferrer">
+                <Zap className="w-4 h-4 fill-current" /> Auto-Trade
+              </a>
             </Button>
           </div>
         </div>
